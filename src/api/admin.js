@@ -53,6 +53,30 @@ export const adminApi = {
   listUserDevices: (userId) =>
     client.get(`/admin/users/${userId}/devices`).then((r) => r.data),
 
+  // Products
+  listProducts: (page = 1, limit = 20) =>
+    client.get('/admin/products/list', { params: { page, limit } }).then((r) => r.data),
+
+  searchProducts: (search, limit = 20) =>
+    client.get('/admin/products', { params: { search, limit } }).then((r) => r.data),
+
+  getProduct: (productId) =>
+    client.get(`/admin/products/${productId}`).then((r) => r.data),
+
+  updateProductSpecs: (productId, specifications) =>
+    client.put(`/admin/products/${productId}/specifications`, { specifications }).then((r) => r.data),
+
+  uploadProductManual: (productId, file) => {
+    const formData = new FormData()
+    formData.append('manual', file)
+    return client.post(`/admin/products/${productId}/manual`, formData, {
+      headers: { 'Content-Type': undefined },
+    }).then((r) => r.data)
+  },
+
+  deleteProductManual: (productId) =>
+    client.delete(`/admin/products/${productId}/manual`).then((r) => r.data),
+
   // Notifications
   sendNotification: (payload) =>
     client.post('/admin/notifications/send', payload).then((r) => r.data),

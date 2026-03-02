@@ -8,6 +8,8 @@ import UsersList from './pages/UsersList'
 import UserDetail from './pages/UserDetail'
 import DevicesList from './pages/DevicesList'
 import DeviceDetail from './pages/DeviceDetail'
+import ProductsList from './pages/ProductsList'
+import ProductDetail from './pages/ProductDetail'
 import AuditLog from './pages/AuditLog'
 import Notifications from './pages/Notifications'
 
@@ -29,6 +31,8 @@ export default function App() {
             <Route path="/users/:userId" element={<UserDetail />} />
             <Route path="/devices" element={<DevicesList />} />
             <Route path="/devices/:deviceId" element={<DeviceDetail />} />
+            <Route path="/products" element={<ProductsList />} />
+            <Route path="/products/:productId" element={<ProductDetail />} />
             <Route path="/notifications" element={<Notifications />} />
             <Route path="/audit-log" element={<AuditLog />} />
           </Route>

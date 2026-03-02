@@ -7,6 +7,7 @@ import {
   LayoutDashboard,
   Users,
   Smartphone,
+  Package,
   Bell,
   ClipboardList,
   LogOut,
@@ -18,6 +19,7 @@ const navItems = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/users', icon: Users, label: 'Users' },
   { to: '/devices', icon: Smartphone, label: 'Devices' },
+  { to: '/products', icon: Package, label: 'Products' },
   { to: '/notifications', icon: Bell, label: 'Notifications' },
   { to: '/audit-log', icon: ClipboardList, label: 'Audit Log' },
 ]
