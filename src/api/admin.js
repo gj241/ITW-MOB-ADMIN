@@ -10,8 +10,11 @@ export const adminApi = {
     client.get('/admin/dashboard').then((r) => r.data),
 
   // Users
-  listUsers: (page = 1, limit = 20) =>
-    client.get('/admin/users/list', { params: { page, limit } }).then((r) => r.data),
+  listUsers: (page = 1, limit = 20, filters = {}) => {
+    const params = { page, limit }
+    Object.entries(filters).forEach(([k, v]) => { if (v !== '' && v != null) params[k] = v })
+    return client.get('/admin/users/list', { params }).then((r) => r.data)
+  },
 
   searchUsers: (search, limit = 20) =>
     client.get('/admin/users', { params: { search, limit } }).then((r) => r.data),
@@ -25,12 +28,18 @@ export const adminApi = {
   deleteUser: (userId) =>
     client.delete(`/admin/users/${userId}`).then((r) => r.data),
 
+  sendPasswordReset: (userId) =>
+    client.post(`/admin/users/${userId}/reset-password`).then((r) => r.data),
+
   recentRegistrations: (days = 7, limit = 20) =>
     client.get('/admin/users/recent', { params: { days, limit } }).then((r) => r.data),
 
   // Devices
-  listDevices: (page = 1, limit = 20) =>
-    client.get('/admin/devices/list', { params: { page, limit } }).then((r) => r.data),
+  listDevices: (page = 1, limit = 20, filters = {}) => {
+    const params = { page, limit }
+    Object.entries(filters).forEach(([k, v]) => { if (v !== '' && v != null) params[k] = v })
+    return client.get('/admin/devices/list', { params }).then((r) => r.data)
+  },
 
   searchDevices: (search, limit = 20) =>
     client.get('/admin/devices', { params: { search, limit } }).then((r) => r.data),
@@ -49,6 +58,9 @@ export const adminApi = {
 
   deleteDevice: (deviceId) =>
     client.delete(`/admin/devices/${deviceId}`).then((r) => r.data),
+
+  getDeviceTelemetryHistory: (deviceId, days = 7, limit = 2000) =>
+    client.get(`/admin/devices/${deviceId}/telemetry`, { params: { days, limit } }).then((r) => r.data),
 
   listUserDevices: (userId) =>
     client.get(`/admin/users/${userId}/devices`).then((r) => r.data),

@@ -15,7 +15,7 @@ import {
   DialogTrigger,
 } from '../components/ui/dialog'
 import DataTable from '../components/DataTable'
-import { ArrowLeft, Shield, ShieldOff, CheckCircle, XCircle, Trash2 } from 'lucide-react'
+import { ArrowLeft, Shield, ShieldOff, CheckCircle, XCircle, Trash2, KeyRound } from 'lucide-react'
 
 export default function UserDetail() {
   const { userId } = useParams()
@@ -24,6 +24,7 @@ export default function UserDetail() {
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
+  const [resetSent, setResetSent] = useState(false)
 
   const load = async () => {
     try {
@@ -69,6 +70,19 @@ export default function UserDetail() {
       navigate('/users')
     } catch (err) {
       console.error('Failed to delete user', err)
+      setActionLoading(false)
+    }
+  }
+
+  const handlePasswordReset = async () => {
+    setActionLoading(true)
+    try {
+      await adminApi.sendPasswordReset(userId)
+      setResetSent(true)
+      setTimeout(() => setResetSent(false), 3000)
+    } catch (err) {
+      console.error('Failed to send password reset', err)
+    } finally {
       setActionLoading(false)
     }
   }
@@ -122,6 +136,16 @@ export default function UserDetail() {
         <CardContent className="space-y-3">
           <div className="grid grid-cols-2 gap-4 text-sm sm:grid-cols-3">
             <div>
+              <p className="text-muted-foreground">Display Name</p>
+              <p>{user.displayName || '-'}</p>
+            </div>
+            <div>
+              <p className="text-muted-foreground">Auth Provider</p>
+              <Badge variant={user.authProvider === 'apple' ? 'secondary' : user.authProvider === 'google' ? 'outline' : 'default'}>
+                {user.authProvider || 'email'}
+              </Badge>
+            </div>
+            <div>
               <p className="text-muted-foreground">Phone</p>
               <p>{user.phone || '-'}</p>
             </div>
@@ -149,6 +173,14 @@ export default function UserDetail() {
               <p className="text-muted-foreground">Devices</p>
               <p>{user.devices?.length || 0}</p>
             </div>
+            <div>
+              <p className="text-muted-foreground">Platform</p>
+              <p>{user.platform ? `${user.platform}${user.osVersion ? ` (OS ${user.osVersion})` : ''}` : '-'}</p>
+            </div>
+            <div>
+              <p className="text-muted-foreground">App Version</p>
+              <p>{user.appVersion || '-'}</p>
+            </div>
           </div>
 
           <div className="flex flex-wrap gap-2 pt-2">
@@ -169,6 +201,15 @@ export default function UserDetail() {
             >
               {user.verified ? <XCircle className="mr-1 h-4 w-4" /> : <CheckCircle className="mr-1 h-4 w-4" />}
               {user.verified ? 'Unverify' : 'Verify'}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handlePasswordReset}
+              disabled={actionLoading || resetSent}
+            >
+              <KeyRound className="mr-1 h-4 w-4" />
+              {resetSent ? 'Reset Email Sent!' : 'Send Password Reset'}
             </Button>
             <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
               <DialogTrigger asChild>
@@ -197,6 +238,32 @@ export default function UserDetail() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Client devices (phones/tablets) */}
+      {user.clientDevices?.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Phones / Tablets ({user.clientDevices.length})</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {user.clientDevices.map((cd, i) => (
+                <div key={i} className="rounded-md border p-3 text-sm space-y-1">
+                  <div className="flex items-center gap-2">
+                    <Badge variant={cd.platform === 'android' ? 'default' : 'secondary'}>
+                      {cd.platform}
+                    </Badge>
+                    {cd.appVersion && <span className="text-muted-foreground">v{cd.appVersion}</span>}
+                    {cd.osVersion && <span className="text-muted-foreground">OS {cd.osVersion}</span>}
+                  </div>
+                  <p className="text-xs text-muted-foreground font-mono truncate">{cd.deviceIdentifier}</p>
+                  <p className="text-xs text-muted-foreground">Last seen: {new Date(cd.lastSeen).toLocaleString()}</p>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* User's devices */}
       <div>

@@ -16,7 +16,19 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '../components/ui/dialog'
-import { ArrowLeft, Eye, EyeOff, Trash2, ArrowRightLeft, XCircle } from 'lucide-react'
+import { ArrowLeft, Eye, EyeOff, Trash2, ArrowRightLeft, XCircle, Battery, Zap, Thermometer, ShieldAlert } from 'lucide-react'
+
+function SocColor({ soc }) {
+  if (soc > 50) return 'text-green-600'
+  if (soc > 20) return 'text-amber-600'
+  return 'text-red-600'
+}
+
+function TempColor(temp) {
+  if (temp > 55) return 'text-red-600'
+  if (temp > 40) return 'text-amber-600'
+  return 'text-green-600'
+}
 
 export default function DeviceDetail() {
   const { deviceId } = useParams()
@@ -48,6 +60,10 @@ export default function DeviceDetail() {
   const [transferOpen, setTransferOpen] = useState(false)
   const [newOwnerId, setNewOwnerId] = useState('')
 
+  // Telemetry history
+  const [telemetryHistory, setTelemetryHistory] = useState([])
+  const [historyDays, setHistoryDays] = useState(7)
+
   const load = async () => {
     try {
       const res = await adminApi.getDevice(deviceId)
@@ -59,7 +75,17 @@ export default function DeviceDetail() {
     }
   }
 
+  const loadHistory = async () => {
+    try {
+      const res = await adminApi.getDeviceTelemetryHistory(deviceId, historyDays)
+      setTelemetryHistory(res.data || [])
+    } catch (err) {
+      console.error('Failed to load telemetry history', err)
+    }
+  }
+
   useEffect(() => { load() }, [deviceId])
+  useEffect(() => { loadHistory() }, [deviceId, historyDays])
 
   const revealPin = async () => {
     if (pinVisible) {
@@ -133,6 +159,8 @@ export default function DeviceDetail() {
     return <p className="text-muted-foreground">Device not found</p>
   }
 
+  const t = device.lastTelemetry
+
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">
@@ -142,12 +170,13 @@ export default function DeviceDetail() {
         <h1 className="text-2xl font-bold">Device Detail</h1>
       </div>
 
+      {/* Header info */}
       <Card>
         <CardHeader>
           <CardTitle className="text-lg">{device.customName || 'Unnamed Device'}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 gap-4 text-sm sm:grid-cols-3">
+          <div className="grid grid-cols-2 gap-4 text-sm sm:grid-cols-3 lg:grid-cols-4">
             <div>
               <p className="text-muted-foreground">ID</p>
               <p className="font-mono text-xs break-all">{device.id}</p>
@@ -159,6 +188,14 @@ export default function DeviceDetail() {
             <div>
               <p className="text-muted-foreground">MAC Address</p>
               <p className="font-mono">{device.macAddress || '-'}</p>
+            </div>
+            <div>
+              <p className="text-muted-foreground">Bluetooth MAC</p>
+              <p className="font-mono">{device.bluetoothMac || '-'}</p>
+            </div>
+            <div>
+              <p className="text-muted-foreground">Firmware</p>
+              <p>{device.firmwareVersion || '-'}</p>
             </div>
             <div>
               <p className="text-muted-foreground">Owner</p>
@@ -174,12 +211,20 @@ export default function DeviceDetail() {
               )}
             </div>
             <div>
+              <p className="text-muted-foreground">Platform</p>
+              <p>{device.owner?.platform || '-'}</p>
+            </div>
+            <div>
               <p className="text-muted-foreground">Created</p>
               <p>{new Date(device.createdAt).toLocaleString()}</p>
             </div>
             <div>
               <p className="text-muted-foreground">Last Connected</p>
               <p>{device.lastConnected ? new Date(device.lastConnected).toLocaleString() : 'Never'}</p>
+            </div>
+            <div>
+              <p className="text-muted-foreground">Alert Threshold</p>
+              <p>{device.alertLowBattery != null ? `${device.alertLowBattery}%` : 'Not set'}</p>
             </div>
           </div>
 
@@ -277,6 +322,246 @@ export default function DeviceDetail() {
               </DialogContent>
             </Dialog>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Telemetry Dashboard */}
+      {t && (
+        <>
+          {/* Protection alerts */}
+          {t.activeProtections?.length > 0 && (
+            <div className="rounded-lg border border-red-300 bg-red-50 p-4">
+              <div className="flex items-center gap-2 text-red-700 font-semibold mb-1">
+                <ShieldAlert className="h-5 w-5" />
+                Active Protection Faults
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {t.activeProtections.map((p, i) => (
+                  <Badge key={i} variant="destructive">{p}</Badge>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Status cards */}
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">SOC</CardTitle>
+                <Battery className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <p className={`text-3xl font-bold ${SocColor({ soc: t.soc })}`}>
+                  {t.soc != null ? `${t.soc}%` : '-'}
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">Voltage</CardTitle>
+                <Zap className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <p className="text-3xl font-bold">{t.voltage != null ? `${t.voltage}V` : '-'}</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">Current</CardTitle>
+                <Zap className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <p className="text-3xl font-bold">
+                  {t.current != null ? `${t.current}A` : '-'}
+                </p>
+                {t.current != null && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {t.current < 0 ? 'Charging' : t.current > 0 ? 'Discharging' : 'Idle'}
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">Power</CardTitle>
+                <Zap className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <p className="text-3xl font-bold">{t.power != null ? `${t.power}W` : '-'}</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">Cycles</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-3xl font-bold">{t.cycleCount != null ? t.cycleCount : '-'}</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">Capacity</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-2xl font-bold">
+                  {t.residualCapacity != null && t.nominalCapacity != null
+                    ? `${t.residualCapacity} / ${t.nominalCapacity} Ah`
+                    : '-'}
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Cell voltages */}
+          {t.cellVoltages?.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Cell Voltages</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {(() => {
+                  const min = Math.min(...t.cellVoltages)
+                  const max = Math.max(...t.cellVoltages)
+                  const delta = ((max - min) * 1000).toFixed(0)
+                  return (
+                    <>
+                      <div className="mb-3 flex gap-4 text-sm">
+                        <span>Min: <strong className="text-red-600">{min.toFixed(3)}V</strong></span>
+                        <span>Max: <strong className="text-green-600">{max.toFixed(3)}V</strong></span>
+                        <span>Delta: <strong className={parseInt(delta) > 50 ? 'text-red-600' : parseInt(delta) > 20 ? 'text-amber-600' : 'text-green-600'}>{delta}mV</strong></span>
+                      </div>
+                      <div className="grid grid-cols-4 gap-2 sm:grid-cols-8">
+                        {t.cellVoltages.map((v, i) => {
+                          let bg = 'bg-muted'
+                          if (v === min) bg = 'bg-red-100 border-red-300'
+                          else if (v === max) bg = 'bg-green-100 border-green-300'
+                          return (
+                            <div key={i} className={`rounded-md border p-2 text-center ${bg}`}>
+                              <p className="text-xs text-muted-foreground">C{i + 1}</p>
+                              <p className="font-mono text-sm font-semibold">{(v * 1000).toFixed(0)}</p>
+                              <p className="text-xs text-muted-foreground">mV</p>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </>
+                  )
+                })()}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Temperatures + MOS status */}
+          <div className="grid gap-4 sm:grid-cols-2">
+            {t.temperatures?.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Thermometer className="h-4 w-4" /> Temperatures
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex gap-4">
+                    {t.temperatures.map((temp, i) => (
+                      <div key={i} className="text-center">
+                        <p className="text-xs text-muted-foreground">Sensor {i + 1}</p>
+                        <p className={`text-2xl font-bold ${TempColor(temp)}`}>{temp}°C</p>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">MOS Status</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex gap-6">
+                  <div className="flex items-center gap-2">
+                    <span className={`h-3 w-3 rounded-full ${t.chargingEnabled ? 'bg-green-500' : 'bg-red-500'}`} />
+                    <span className="text-sm">Charge {t.chargingEnabled ? 'ON' : 'OFF'}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className={`h-3 w-3 rounded-full ${t.dischargingEnabled ? 'bg-green-500' : 'bg-red-500'}`} />
+                    <span className="text-sm">Discharge {t.dischargingEnabled ? 'ON' : 'OFF'}</span>
+                  </div>
+                </div>
+                {t.protectionFlags != null && t.protectionFlags > 0 && (
+                  <p className="mt-2 text-xs text-muted-foreground">Protection flags: 0x{t.protectionFlags.toString(16).toUpperCase().padStart(4, '0')}</p>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          {device.telemetryUpdatedAt && (
+            <p className="text-xs text-muted-foreground">
+              Telemetry updated: {new Date(device.telemetryUpdatedAt).toLocaleString()}
+            </p>
+          )}
+        </>
+      )}
+
+      {!t && (
+        <Card>
+          <CardContent className="py-8 text-center text-muted-foreground">
+            No telemetry data received yet
+          </CardContent>
+        </Card>
+      )}
+
+      {/* SOC History */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle className="text-base">SOC History</CardTitle>
+          <div className="flex gap-1">
+            {[7, 14, 30].map((d) => (
+              <Button
+                key={d}
+                variant={historyDays === d ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setHistoryDays(d)}
+              >
+                {d}d
+              </Button>
+            ))}
+          </div>
+        </CardHeader>
+        <CardContent>
+          {telemetryHistory.length > 0 ? (
+            <div className="space-y-2">
+              {/* Simple text-based SOC timeline — replace with a chart library if desired */}
+              <div className="h-48 flex items-end gap-px overflow-hidden rounded-md bg-muted p-1">
+                {telemetryHistory
+                  .filter((e) => e.soc != null)
+                  .slice(-200) // show last 200 data points
+                  .map((e, i) => (
+                    <div
+                      key={i}
+                      className="flex-1 min-w-[2px] rounded-t-sm"
+                      style={{
+                        height: `${e.soc}%`,
+                        backgroundColor: e.soc > 50 ? '#16a34a' : e.soc > 20 ? '#d97706' : '#dc2626',
+                      }}
+                      title={`${e.soc}% — ${new Date(e.recordedAt).toLocaleString()}`}
+                    />
+                  ))}
+              </div>
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>{telemetryHistory.length > 0 ? new Date(telemetryHistory[0].recordedAt).toLocaleDateString() : ''}</span>
+                <span>{telemetryHistory.length > 0 ? new Date(telemetryHistory[telemetryHistory.length - 1].recordedAt).toLocaleDateString() : ''}</span>
+              </div>
+              <p className="text-xs text-muted-foreground">{telemetryHistory.length} readings over {historyDays} days</p>
+            </div>
+          ) : (
+            <p className="text-muted-foreground text-sm py-4 text-center">No telemetry history available</p>
+          )}
         </CardContent>
       </Card>
     </div>
